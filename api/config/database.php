@@ -13,13 +13,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 session_start();
 
-$host = 'db';
-$user = 'root';
-$pass = 'root';
-$db   = 'QuanLyNhaSach';
+$host = "db";             // Tên service MySQL trong docker-compose
+$dbname = "QuanLyNhaSach";
+$username = "root";       // Dùng root hoặc quanlyuser
+$password = "rootpassword"; // Mật khẩu tương ứng (rootpassword hoặc quanlypass)
 
 try {
-    $conn = new PDO("mysql:host=$host;dbname=$db;charset=utf8mb4", $user, $pass);
+    // Đã sửa: $db -> $dbname | $user -> $username | $pass -> $password
+    $conn = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
@@ -27,7 +28,7 @@ try {
     echo json_encode([
         'success' => false,
         'message' => 'Lỗi kết nối cơ sở dữ liệu: ' . $e->getMessage()
-    ]);
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 

@@ -1,28 +1,73 @@
 version: '3.8'
 
 services:
-  web:
-    build: .
-    container_name: quanlymuontrasach_web
-    ports:
-      - "8080:80"
-    volumes:
-      - .:/var/www/html
-    depends_on:
-      - db
-    restart: always
-
+  # ─── MySQL Database ───────────────────────────────────────────────
   db:
     image: mysql:8.0
-    container_name: quanlymuontrasach_db
+    container_name: quanly_db
+    restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
       MYSQL_DATABASE: QuanLyNhaSach
-    ports:
-      - "3307:3306"
+      MYSQL_USER: ${MYSQL_USER:-quanlyuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-quanlypass}
     volumes:
       - db_data:/var/lib/mysql
-    restart: always
+      - ./database.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "3307:3306"   # expose ra ngoài port 3307 để tránh xung đột XAMPP
+    networks:
+      - quanly_net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── PHP Apache App ───────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quanly_app
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_NAME: QuanLyNhaSach
+      DB_USER: ${MYSQL_USER:-quanlyuser}
+      DB_PASS: ${MYSQL_PASSWORD:-quanlypass}
+    ports:
+      - "8088:80"       # Truy cập trực tiếp qua IP (vd: http://178.x.x.x)
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - quanly_net
+    volumes:
+      # Hot-reload: mount source code (có thể bỏ khi deploy production)
+      - ./api:/var/www/html/Quanlymuontrasach/api
+      - ./frontend:/var/www/html/Quanlymuontrasach/frontend
+
+  # ─── phpMyAdmin (tuỳ chọn) ────────────────────────────────────────
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: quanly_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+    ports:
+      - "8081:80"     # Truy cập tại http://localhost:8081
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - quanly_net
 
 volumes:
   db_data:
+
+networks:
+  quanly_net:
+    driver: bridge
